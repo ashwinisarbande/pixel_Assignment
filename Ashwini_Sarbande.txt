@@ -1,0 +1,250 @@
+1. Create a Spring Boot Application:
+pom.xml file-
+
+<!-- Add Spring Boot Starter Web dependency -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-web</artifactId>
+</dependency>
+
+<!-- Add MySQL Connector dependency -->
+<dependency>
+    <groupId>mysql</groupId>
+    <artifactId>mysql-connector-java</artifactId>
+</dependency>
+---------------------------------------------------------------------------------
+2.application.properties (or application.yml):
+server.port=8085
+spring.application.name=Pixel_SpringBootApp
+# MySQL database configuration
+spring.datasource.url=jdbc:mysql://localhost:3306/springbbot
+spring.datasource.username=root
+spring.datasource.password=root
+spring.jpa.show-sql=true
+spring.jpa.generate-ddl=true
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQL8Dialec
+-------------------------------------------------------------------------------------
+3.create package for model and add one class Animal
+package com.mit.Pixel_SpringBootAppModel;
+
+import javax.persistence.*;
+
+@Entity
+@Table(name = "animal")
+public class Animal {
+    
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    private String name;
+    private String category;
+    private String image;
+    private String description;
+    private String lifeExpectancy;
+	public Object getLifeExpectancy() {
+		
+		return null;
+	}
+	
+---- - -------------- ------------------------------------------------------------------
+4. Create Repository Interface:
+package com.mit.Pixel_SpringBootAppRepository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.mit.Pixel_SpringBootAppModel.Animal;
+
+public interface AnimalRepository extends JpaRepository<Animal, Long> {
+
+}
+-------------------------------------------------------------------------------------
+5. Create HTML Form for Submitting/Editing Animal Information:
+
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Animal Form</title>
+</head>
+<body>
+    <h2>Animal Form</h2>
+    <form action="#" th:action="@{/saveAnimal}" th:object="${animal}" method="post">
+        <input type="text" th:field="*{name}" placeholder="Name" required/><br/>
+        <input type="text" th:field="*{category}" placeholder="Category" required/><br/>
+        <input type="text" th:field="*{image}" placeholder="Image URL"/><br/>
+        <textarea th:field="*{description}" placeholder="Description" required></textarea><br/>
+        <select th:field="*{lifeExpectancy}" required>
+            <option value="2-5">2-5 years</option>
+            <option value="5-10">5-10 years</option>
+            <option value="10+">10+ years</option>
+        </select><br/>
+        <!-- Add Captcha here -->
+        <button type="submit">Submit</button>
+    </form>
+</body>
+</html>
+----------------------------------------------------------------------------------
+6.Handle Form Submission in Controller:
+
+package com.mit.Pixel_SpringBootAppRestController;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.*;
+
+import com.mit.Pixel_SpringBootAppModel.Animal;
+import com.mit.Pixel_SpringBootAppService.AnimalService;
+
+@Controller
+@RequestMapping("/animals")
+public class AnimalController {
+
+    @Autowired
+    private AnimalService animalService;
+
+    
+    @GetMapping("/edit/{id}")
+    public String editAnimalForm(@PathVariable("id") Long id, Model model) {
+        Animal animal = animalService.findById(id);
+        model.addAttribute("animal", animal);
+        return "edit_animal";
+    }
+
+    
+    @PostMapping("/edit/{id}")
+    public String editAnimalSubmit(@PathVariable("id") Long id, @ModelAttribute Animal updatedAnimal) {
+        Animal existingAnimal = animalService.findById(id);
+        
+        existingAnimal.setName(updatedAnimal.getName());
+        existingAnimal.setCategory(updatedAnimal.getCategory());
+        existingAnimal.setDescription(updatedAnimal.getDescription());
+        existingAnimal.setLifeExpectancy(updatedAnimal.getLifeExpectancy());
+        
+        animalService.save(existingAnimal);
+        return "redirect:/animals/list";
+    }
+
+    /// Delete animal
+    //@GetMapping("/delete/{id}")
+   // public String deleteAnimal(@PathVariable("id") Long id) {
+                //Animal animal = animalService.findById(id);
+                //animalService.delete(animal);
+        //return "redirect:/animals/list";
+    
+    
+ // Handle delete animal request
+    @GetMapping("/delete/{id}")
+    public String deleteAnimal(@PathVariable("id") Long id) {
+                Animal animal = animalService.findById(id);
+                animalService.delete(animal);
+                return "redirect:/animals/list";
+    }
+    }
+
+-----------------------------------------------------------------------------
+7. Create HTML Page for Listing Animals:
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Animal List</title>
+</head>
+<body>
+    <h2>Animal List</h2>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Category</th>
+                <th>Description</th>
+                <th>Life Expectancy</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="animal : ${animals}">
+                <td th:text="${animal.name}"></td>
+                <td th:text="${animal.category}"></td>
+                <td th:text="${animal.description}"></td>
+                <td th:text="${animal.lifeExpectancy}"></td>
+                <td>
+                    <a th:href="@{/editAnimal/{id}(id=${animal.id})}">Edit</a>
+                    <a th:href="@{/deleteAnimal/{id}(id=${animal.id})}">Delete</a>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+</html>
+-----------------------------------------------------------------------------------
+8.Sorting Logic:
+package com.mit.Pixel_SpringBootAppService;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+
+import com.mit.Pixel_SpringBootAppModel.Animal;
+import com.mit.Pixel_SpringBootAppRepository.AnimalRepository;
+
+import java.util.List;
+
+@Service
+public class AnimalService {
+
+    @Autowired
+    private AnimalRepository animalRepository;
+
+    // Method to retrieve all animals sorted by name
+    public List<Animal> findAllSortedByName() {
+        Sort sort = Sort.by(Sort.Direction.ASC, "name");
+        return animalRepository.findAll(sort);
+    }
+
+    // Method to retrieve all animals sorted by category
+    public List<Animal> findAllSortedByCategory() {
+        Sort sort = Sort.by(Sort.Direction.ASC, "category");
+        return animalRepository.findAll(sort);
+    }
+
+    // Method to retrieve all animals sorted by life expectancy
+    public List<Animal> findAllSortedByLifeExpectancy() {
+        Sort sort = Sort.by(Sort.Direction.ASC, "lifeExpectancy");
+        return animalRepository.findAll(sort);
+    }
+
+	public void delete(Animal animal) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	public Animal findById(Long id) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	public void save1(Animal existingAnimal) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	public Animal findById1(Long id) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	public void save11(Animal existingAnimal) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	public void save(Animal existingAnimal) {
+		// TODO Auto-generated method stub
+		
+	}
+}
+
